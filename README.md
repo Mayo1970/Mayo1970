@@ -1,4 +1,4 @@
-## Hi there 👋
+<img width="686" height="386" alt="1778598658159" src="https://github.com/user-attachments/assets/352bf4cd-a739-4ba3-af65-567f6243aca0" />
 
 <!--
 **Mayo1970/Mayo1970** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
