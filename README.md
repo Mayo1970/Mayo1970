@@ -17,7 +17,7 @@
 
 [ioQuake3-U](https://github.com/Mayo1970/ioQuake3-U) - WiiU port
 
-Xbox port - Coming soon
+[ioquake3-Xbox](https://github.com/Mayo1970/ioQuake3-Xbox) - OG Xbox port
 
 ## Misc
 [Xash3D-FWGS](https://github.com/Mayo1970/xash3d-fwgs) - Playstation 3 port of [Xash3D-FWGS](https://github.com/FWGS/xash3d-fwgs)
