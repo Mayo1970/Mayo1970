@@ -24,4 +24,4 @@
 
 [OpenFreshAdventures](https://github.com/Mayo1970/OpenFA) - Open source engine that supports Kinder & Ferrero - Fresh Adventures
 
-Dreamcast emulator on PS3 - Coming soon
+[NotDC](https://github.com/Mayo1970/NotDC-PS3) - Dreamcast emulator on PS3
