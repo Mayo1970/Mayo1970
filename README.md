@@ -22,6 +22,8 @@
 ## Misc
 [Xash3D-FWGS](https://github.com/Mayo1970/xash3d-fwgs) - Playstation 3 port of [Xash3D-FWGS](https://github.com/FWGS/xash3d-fwgs)
 
-[OpenFreshAdventures](https://github.com/Mayo1970/OpenFA) - Open source engine that supports Kinder & Ferrero - Fresh Adventures
-
 [NotDC](https://github.com/Mayo1970/NotDC-PS3) - Dreamcast emulator on PS3
+
+[Halo-CE PS3](https://github.com/Mayo1970/halo-ce-ps3) - Halo: Combat Evolved PS3 port based off [OpenCE](https://github.com/OpenCommunityEdition/OpenCE)
+
+[OpenFreshAdventures](https://github.com/Mayo1970/OpenFA) - Open source engine that supports Kinder & Ferrero - Fresh Adventures
