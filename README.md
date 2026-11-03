@@ -27,3 +27,5 @@
 [Halo-CE PS3](https://github.com/Mayo1970/halo-ce-ps3) - Halo: Combat Evolved PS3 port based off [OpenCE](https://github.com/OpenCommunityEdition/OpenCE)
 
 [OpenFreshAdventures](https://github.com/Mayo1970/OpenFA) - Open source engine that supports Kinder & Ferrero - Fresh Adventures
+
+[Melee-PS3](https://github.com/Mayo1970/melee-ps3) - Super Smash Bros Melee port for the Playstation 3
