@@ -19,6 +19,8 @@
 
 [ioQuake3-Xbox](https://github.com/Mayo1970/ioQuake3-Xbox) - OG Xbox port
 
+[ioQuake360](https://github.com/Mayo1970/ioQuake360) - Xbox360 port
+
 ## Misc
 [Xash3D-FWGS](https://github.com/Mayo1970/xash3d-fwgs) - Playstation 3 port of [Xash3D-FWGS](https://github.com/FWGS/xash3d-fwgs)
 
