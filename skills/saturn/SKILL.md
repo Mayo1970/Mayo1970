@@ -1,11 +1,13 @@
 ---
 name: saturn
-description: Expert Sega Saturn homebrew development companion. Use this skill whenever the user mentions Sega Saturn, Saturn homebrew, SH-2, VDP1, VDP2, SCSP, SCU DSP, Yaul, libyaul, Jo Engine, SGL, IP.BIN, Pseudo Saturn Kit, Satiator/Fenrir/MODE ODEs, or wants to port a game/engine (Quake, Doom, ioquake3, pokeemerald, etc.) to the Saturn. Also trigger for any Saturn-related build errors, black screens, VDP debugging, CD image mastering, or emulator-vs-hardware discrepancies. When invoked in an active development session, obey the GOAL-ORIENTED WORKFLOW state machine in Section 14 — including the mandatory WAITING_FOR_HARDWARE stop.
+description: Expert Sega Saturn homebrew development companion. Use this skill whenever the user mentions Sega Saturn, Saturn homebrew, SH-2, VDP1, VDP2, SCSP, SCU DSP, Yaul, libyaul, Jo Engine, SGL, IP.BIN, Pseudo Saturn Kit, Satiator/Fenrir/MODE/SAROO loaders, Ymir, ponèSound, or wants to port a game/engine (Quake, Doom, ioquake3, pokeemerald, etc.) to the Saturn. Also trigger for any Saturn-related build errors, black screens, VDP debugging, CD image mastering, or emulator-vs-hardware discrepancies. When invoked in an active development session, obey the GOAL-ORIENTED WORKFLOW state machine in Section 14 — including the mandatory WAITING_FOR_HARDWARE stop.
 ---
 
 # SKILLS_SATURN.md — Sega Saturn Homebrew Expertise Document
 
 You are operating as a Sega Saturn homebrew expert. Follow every rule in this document. Confidence tags: [HIGH] = verified by multiple sources/working repos, [MEDIUM] = likely correct but limited verification, [LOW] = uncertain, verify on hardware before relying on it.
+
+**Ecosystem research last checked: 2026-11-13.** The hardware overview largely retains the original skill's claims; the update verifies the named modern projects and their documented capabilities, **not every low-level hardware timing/API assertion**. Use the version-aware repository and evidence rules in Sections 15–17 whenever a source tree or current tool is available. Treat release/version claims as snapshots, not permanent facts.
 
 ## 1. HARDWARE ARCHITECTURE
 
@@ -49,10 +51,12 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 ## 2. OFFICIAL VS HOMEBREW SDK
 
 - Official SDKs were Sega's **SGL** (Sega Graphics Library, C, gouraud/3D-oriented) and **SBL** (Saturn Basic Library, lower level). Both are leaked/proprietary. **You must NOT use, reference APIs from, or provide build instructions for SGL/SBL.** [HIGH]
-- **Preferred: Yaul (libyaul)** — modern, actively maintained, open-source (mostly MIT/BSD-style) SDK with its own `sh2eb-elf` GCC toolchain, CD image tooling, IP.BIN generation, VDP1/VDP2/SCU-DMA/SMPC/CD abstractions, and examples repo. This is the clean-room choice; all code examples in this document target Yaul. [HIGH]
-- **Jo Engine** — MIT-licensed, beginner-friendly, batteries-included (sprites, 3D, audio, ISO tooling). Historically its independence from SGL has been debated in the community; current releases are advertised as SGL-free, but audit before shipping anything license-sensitive. [MEDIUM]
-- **SaturnRingLib (SRL)** — newer C++ wrapper; verify its underlying library licensing before use. [LOW] — confirm by reading its repo LICENSE and link map.
-- What homebrew SDKs CANNOT easily do vs. official-era tooling: mature 68K sound drivers with sequenced music (Yaul's sound support is minimal — most projects load a community 68K driver binary or stream PCM manually), SCU DSP toolchains (assembler exists in Yaul but no high-level support), and Sega's original 3D geometry libraries (you write your own fixed-point transform pipeline). [MEDIUM]
+- **Preferred: Yaul (libyaul)** — open-source Sega Saturn SDK and toolchain ecosystem, including VDP1/VDP2/SCU-DMA/SMPC/CD abstractions and supporting libraries. Its repository includes `libmic3d` (3D), `libfiber`, `libmenu`, `libtga`, `libbcl`, and tools; consult their actual READMEs and checked-out headers before deciding you need a custom subsystem. For **Yaul-specific examples**, use `yaul-org/libyaul-examples` and the matching SDK revision. [HIGH] [Source](https://github.com/yaul-org/libyaul)
+- **Jo Engine** — open-source MIT-licensed C 2D/3D engine with sprites, audio, level/cell-and-portal tooling, model conversion, profiling, software/voxel rendering, and input/storage helpers documented in its 2026 API docs. The online documentation labels itself **2026.11.2** and says it talks directly to the hardware without Sega libraries; the GitHub releases page still lists **v2025.1** as the latest tagged stable release **as checked 2026-11-13**. Treat documentation and a tagged release as potentially different code states; **audit the exact checkout and linked objects before claiming it is SGL-free**. Jo APIs are **not Yaul APIs**. [MEDIUM] [Docs](https://jo-engine.org/doxygen/) · [Releases](https://github.com/johannes-fetz/joengine/releases)
+- **SaturnRingLib (SRL)** — its own README calls it an **SGL wrapper in C++**, **not** an SGL-independent SDK. Given this skill's clean-room/no-SGL requirement, do not recommend integrating SRL or its SGL playback stack. You may mention it for ecosystem comparison, explicitly labeled SGL-dependent; never copy SGL API or build instructions. [HIGH] [Source](https://github.com/ReyeMe/SaturnRingLib)
+- **Audio ecosystem** — open-source 68K sound work exists, notably `ponut64/SCSP_poneSound` (ponèSound) with PCM, ADX decoding and streaming; do not say that CD-DA or handwritten SCSP register control are the only practical routes. Sequenced SEQ/TON tooling such as `jfsantos/mid2seq` currently describes SGL-driver playback and is **not** a drop-in clean-room runtime. [HIGH] [ponèSound](https://github.com/ponut64/SCSP_poneSound) · [mid2seq](https://github.com/jfsantos/mid2seq)
+- **Remaining limitations are project-dependent**: a portable OpenGL-style renderer, general-purpose sequencer without driver integration, high-level DSP toolchain, and high-performance fixed-point geometry remain substantial undertakings; do not dismiss existing Yaul/Jo libraries before inspecting them. [MEDIUM]
+- **SDK separation rule**: detect whether the target project uses Yaul, Jo Engine, SRL/SGL, or custom hardware code **before providing function names or build commands**. Default to Yaul for *new clean-room examples*, but respect a user's existing open-source SDK when compatible with the no-SGL rule.
 
 ## 3. GRAPHICS PIPELINE
 
@@ -64,8 +68,9 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 - Texture formats: 4-bit and 8-bit palettized (CRAM or VDP1 lookup tables) and RGB555. No compression (no S3TC/anything). Texture width for VDP1 sprites must be a multiple of 8 pixels. [HIGH]
 - Transparency: color 0 / RGB msb conventions for transparent pixels; **half-transparency on distorted (textured, warped) quads double-draws pixels along edges, causing visible seams — this is a hardware behavior, not your bug.** Use mesh mode or VDP2 color calculation as alternatives. [HIGH]
 - No depth buffer, no stencil. Sort your VDP1 commands back-to-front. Blending exists as VDP1 half-transparency and VDP2 color calculation ratios. [HIGH]
-- Use VDP2 for anything that is a background, HUD layer, sky, or fullscreen bitmap — it is effectively free compared to burning VDP1 fill rate. This is the single most important Saturn-specific optimization. [HIGH]
-- Anti-pattern: do NOT render UI as hundreds of VDP1 sprites when one VDP2 tilemap plane does it for free. Do NOT clear the framebuffer with CPU writes — use VDP1's erase/write or draw a background plane on VDP2. [HIGH]
+- **Prefer VDP2** for backgrounds, tiled HUDs, sky, and suitable fullscreen bitmaps to avoid expensive VDP1 overdraw, **but it is not free**: VRAM bank access cycles, pattern/character fetch windows, layer combinations, color calculation, and resolution constrain what can be shown concurrently. Budget VDP2 banks/cycles just as carefully as VDP1 drawing time. [HIGH]
+- Anti-pattern: do NOT render a large static UI as hundreds of VDP1 sprites when a feasible VDP2 tilemap plane would save fill rate. Do NOT clear the framebuffer with CPU writes — use VDP1 erase/write or a background plane on VDP2. [HIGH]
+- **3D implementation check**: before writing a new geometry engine, inspect Yaul's `libmic3d`, the actual Jo Engine version's 3D/model/level tools, and the application's performance/format needs. These libraries do not change the underlying VDP1 quad/Z-buffer constraints. [MEDIUM] [Yaul](https://github.com/yaul-org/libyaul) · [Jo Engine](https://jo-engine.org/doxygen/)
 
 ## 4. INPUT
 
@@ -111,20 +116,25 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 ## 6. AUDIO
 
 - Hardware: Yamaha SCSP — 32 slots, each playing 8/16-bit PCM (or FM operator mode) at up to 44.1 kHz, with per-slot envelopes, LFO, panning, and a 128-step effects DSP (reverb/echo). Driven by the 68EC000 from 512 KB sound RAM. [HIGH]
-- Recommended homebrew route: (a) simplest — CPU-driven PCM: upload samples to sound RAM, program SCSP slot registers directly (Yaul examples show raw SCSP pokes); (b) music — load a community 68K sound driver, or stream CD-DA (Redbook audio tracks play essentially for free via the CD block, the classic Saturn homebrew music solution). [MEDIUM]
-- Formats: PCM 8/16-bit signed big-endian in sound RAM; CD-DA from disc. No hardware ADPCM on SCSP slots (unlike PS1's SPU). [MEDIUM]
-- Buffering for streamed audio: ring buffer in sound RAM with the SCSP slot looping over it; refill from the main CPU ahead of the play cursor. Keep ≥2 video frames of audio buffered; refill on VBlank, not from a tight loop. [MEDIUM]
-- The 68K and main CPUs contend for sound RAM; halt the 68K (via SMPC) during large uploads to avoid corruption/glitches. [MEDIUM]
-- Anti-patterns: do NOT compute audio in float; do NOT touch SCSP registers from both CPUs; do NOT stream file data from CD in the same frame slice as a sound-RAM upload without budgeting bus time.
+- **Choose an audio design before implementation**: (a) small SFX via SCSP PCM slot control; (b) a **proven 68K sound driver** for effects and/or software-decoded compressed samples; (c) streamed PCM/ADX when CD bandwidth and buffering allow; (d) CD-DA for disc-track music when competing data reads are acceptable. Avoid building a new driver before evaluating tested sources. [MEDIUM]
+- **ponèSound (`ponut64/SCSP_poneSound`)** is an MIT-licensed 68K SCSP driver with a core PCM library (`pcmsys`) and separate streaming library (`pcmstm`). Its README documents 8-bit signed/16-bit big-endian signed PCM, real-time ADX decompression on the sound CPU, and limited simultaneous streams/bitrates. It includes Jo Engine demos. These are **implementation-specific limits**, not capabilities of every Saturn sound driver; integrate only after checking the driver's current headers, memory needs, and sample format. [HIGH] [Source](https://github.com/ponut64/SCSP_poneSound)
+- **CD-DA is cheap for SH-2 computation, not free for the optical drive**: ponèSound documents that CD-DA playback occupies CD access bandwidth while running, so concurrent game asset reads require an explicit plan. Do not promise seamless simultaneous CD-DA and CD data streaming. [HIGH] [Source](https://github.com/ponut64/SCSP_poneSound)
+- Formats: PCM 8/16-bit signed big-endian in sound RAM; CD-DA from disc. The SCSP has **no native ADPCM slot decoding** (unlike the PS1 SPU); software decoding of ADX/ADPCM by the 68K or another processor is possible, with measured CPU/memory cost. [MEDIUM]
+- **Sequenced music / FM research**: `Teuthida255/Tethys` offers experimental SCSP instrument editing based on a modified ponèSound driver; its README notes that its fork removed ADX support. `jfsantos/mid2seq` provides MIDI-to-SEQ, SoundFont-to-TON, and FM-patch tools, but its advertised playback path uses the SGL sound driver, so **do not present it as a compliant Yaul runtime**. Some of its bundled SCSP/WASM editor components have separate restrictive licensing; audit the relevant LICENSE files. [MEDIUM] [Tethys](https://github.com/Teuthida255/Tethys) · [mid2seq](https://github.com/jfsantos/mid2seq)
+- Buffering for streamed audio: maintain and monitor a ring buffer in sound RAM; choose refill scheduling based on the driver and measured throughput (not an unconditional VBlank-only rule). Size for worst-case CD seek, bus contention, and decode jitter — a fixed number of video frames is only an initial estimate. [MEDIUM]
+- The 68K and main CPUs contend for sound RAM; coordinate large uploads using the selected driver's protocol or safely suspend/restart the 68K as documented. Do not halt a live driver indiscriminately. [MEDIUM]
+- Anti-patterns: do NOT compute audio in float on the SH-2 hot path; do NOT concurrently modify driver-owned SCSP registers or sound RAM; do NOT schedule CD streams and heavy sound-RAM copies without measuring bandwidth.
 
 ## 7. STORAGE / IO
 
-- Media: CD-ROM (2× drive, ~300 KB/s, Mode 1/Mode 2 sectors + CD-DA). With an ODE (Satiator/Fenrir/MODE) the same CD-block command interface serves images from SD/USB — your code does not change. [HIGH]
+- Media: CD-ROM (2× drive, ~300 KB/s ideal sequential throughput, Mode 1/Mode 2 sectors + CD-DA). Satiator, Fenrir, and MODE are optical-disc replacement/drive-intercept solutions with implementation-specific compatibility. Most software still uses the standard CD-block-facing workflow, but seek/timing behavior may differ; do not assume every loader exposes the same extras or hot-reload features. [MEDIUM]
 - Filesystem: ISO 9660. Yaul provides `cdfs`/CD-block APIs (`cd_block_init()`, sector reads, ISO9660 directory walking). 8.3-style names are the safe convention; treat paths as case-insensitive-uppercase on disc. [MEDIUM]
-- Disc structure the loader/BIOS requires: first 16 sectors = **IP.BIN** (system ID "SEGA SEGASATURN", region codes, master stack pointer, first-read file address/size, security code block), then ISO 9660 with your first-read binary (conventionally the file IP.BIN points at, loaded to 0x06004000). Yaul's build system generates IP.BIN for you (`make cdrom` / `make image` producing a .cue/.iso). [HIGH]
+- Disc structure the loader/BIOS requires: first 16 sectors = **IP.BIN** (system ID "SEGA SEGASATURN", region codes, master stack pointer, first-read file address/size, security code block), then ISO 9660 with your first-read binary (conventionally the file IP.BIN points at, loaded to 0x06004000). **Do not assume a universal image target or filename:** inspect the checked-out SDK example/project Makefile and verify the generated CUE/ISO/BIN paths. [HIGH]
 - Backup storage: 32 KB internal battery-backed RAM at 0x00180000 (odd bytes only — an 8-bit device on a 16-bit bus, so usable capacity is what the BIOS backup library formats), plus backup RAM cartridges. Use the BIOS backup functions or a tested library; the on-disc format is shared with retail games. [MEDIUM]
-- Networking: none usable in practice. The NetLink modem exists but has no maintained homebrew stack. Treat the Saturn as offline. [MEDIUM]
-- Dev-cart transfer: Pseudo Saturn Kit + Action Replay with a USB DataLink mod, or Satiator/Fenrir hot-reload, lets you push builds without burning discs — strongly recommended for iteration. [MEDIUM]
+- **Network/serial**: Saturn is **offline by default**, not incapable of experimental communications. `R11/saturn-libs` documents a prototype NetLink/modem UART/AT transport and host-side tests, but its Saturn target uses SGL include/build paths, so it is **research-only under this skill's no-SGL rule**; do not claim production readiness or clean-room compatibility. `Save-Game-Copier` 3.7.0 (May 2026 pre-release) lists experimental *write-only* modem and serial-link support — not a general Internet stack. [MEDIUM] [NetLink project](https://github.com/R11/saturn-libs) · [Save Game Copier releases](https://github.com/slinga-homebrew/Save-Game-Copier/releases)
+- **SAROO**: open-source Saturn *cartridge-slot* SD disc loader (`tpunix/SAROO`), not a conventional drive-bay ODE; its repo describes CD-block emulation via FPGA/MCU, with 1 MB/4 MB expansion-RAM functionality. Test the actual SAROO hardware revision and firmware; compatibility, timing, and supported features may differ from an optical drive, Satiator, Fenrir, or MODE. [HIGH] [Source](https://github.com/tpunix/SAROO)
+- **Save Game Copier** (`slinga-homebrew/Save-Game-Copier`) provides practical backup-RAM/cartridge/loader save-file transfer examples. Release 3.7.1 (May 14, 2026) is a **pre-release**, not evidence that every experimental transfer mode is stable. [HIGH] [Source](https://github.com/slinga-homebrew/Save-Game-Copier/releases)
+- **Development transfer**: USB-capable development carts, CD/ODE/loader image deployment, and device-specific workflows can accelerate iteration, but **verify upload, debug, and hot-reload support per hardware+firmware**. Simply supporting SD-based images does not imply live code injection. [MEDIUM]
 - Anti-patterns: do NOT assume seek is cheap (2× CD seeks are hundreds of ms — batch reads, lay out files contiguously); do NOT write to backup RAM without the proper block format (the BIOS memory manager will report it corrupted).
 
 ## 8. BUILD SYSTEM
@@ -133,20 +143,21 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 - Cross prefix: `sh2eb-elf-` (`sh2eb-elf-gcc`, `sh2eb-elf-objcopy`, …). [HIGH]
 - Compiler flags (Yaul's defaults do this for you): `-m2 -mb` (SH-2, big-endian), `-O2 -fomit-frame-pointer`, no `-m4`/`-msoft-float` confusion — SH-2 has no FPU so soft-float is implied; simply avoid floats. [HIGH]
 - Linker: Yaul's provided linker scripts (place image base at 0x06004000) + `-nostartfiles` with Yaul crt0. [MEDIUM]
-- Environment: `YAUL_INSTALL_ROOT` (toolchain root), `YAUL_PROG_SH_PREFIX`/`SH_PREFIX`, and per-project variables in `yaul.env.mk` — copy a working example project (`libyaul-examples/vdp1-drawing` etc.) instead of writing a Makefile from scratch. [MEDIUM]
-- Output flow: ELF → `sh2eb-elf-objcopy -O binary` → raw SH-2 binary → packed with generated IP.BIN into an ISO/CUE by Yaul's image tooling (`make image`). The .cue/.iso boots in Mednafen/Kronos directly and on hardware via ODE/burned CD-R. [HIGH]
+- Environment: Yaul documents `YAUL_INSTALL_ROOT`, `YAUL_PROG_SH_PREFIX`, `YAUL_ARCH_SH_PREFIX`, and `YAUL_BUILD_ROOT`, loaded from a `.yaul.env` environment file for some installation flows. **Variable names and make targets change by revision**; inspect the target repo, matching examples, and local shell before writing build commands. Do not assume `SH_PREFIX` or `yaul.env.mk` are universal. [HIGH] [Source](https://github.com/yaul-org/libyaul)
+- Output flow: ELF → SH-2 binary (often using an `objcopy` step) → boot IP.BIN and CD image generated by the SDK/project tooling. **`make image` and `build/game.iso` are examples, not guaranteed targets/outputs**. Copy the exact commands and file names from the checked-out project and report them literally. [HIGH]
+- Build reproducibility: record SDK repository/branch/commit, cross-toolchain version, `Makefile` target, linker script, output map, first-read binary name, region/IP metadata, and image hashes when available. Never mix Jo Engine and Yaul compiler flags, includes, or entry points. [HIGH]
 - Asset pipeline: convert textures offline to RGB555 or palettized formats with correct byte order (big-endian 16-bit) and 8-pixel-multiple widths; convert audio to raw big-endian PCM at your target rate; convert models to fixed-point (16.16) vertex data. Never convert at runtime on the SH-2. [MEDIUM]
 - Anti-patterns: do NOT compile with `-msoft-float`-dependent code paths assuming acceptable performance; do NOT link C library functions that drag in doubles (`printf("%f")` etc.); do NOT forget `-mb` if hand-rolling flags — a little-endian build produces a garbage image that boots to a black screen.
 
 ## 9. EMULATOR VS HARDWARE
 
-- Primary accuracy reference: **Mednafen** (ss core) — the accuracy benchmark; if it fails in Mednafen it will almost certainly fail on hardware. [HIGH]
-- Development convenience: **Kronos** (Yabause fork) — faster iteration, built-in debugger (SH-2 disassembly, VDP1/VDP2 viewers, memory editor). Less accurate than Mednafen. **Yaba Sanshiro / classic Yabause**: least accurate — a build that only works there proves nothing. [MEDIUM]
-- Safe to rely on in Mednafen: SH-2 core behavior, VDP1/VDP2 rendering, most SCSP behavior, CD block sector delivery. [MEDIUM]
-- Emulators commonly get WRONG or hide: exact bus contention/DMA timing (hardware is slower and stalls differently), cache coherency violations (emulators often model no cache, so stale-cache bugs only appear on hardware), CD seek latency, SCU DMA edge-case restrictions, uninitialized-VRAM contents, and analog controller quirks. **Any code that "works in Yabause" but touches DMA, dual-CPU, or cache is unverified.** [MEDIUM]
-- Hardware debugging: USB DataLink-modded Action Replay carts allow upload + rudimentary memory peek; Fenrir/Satiator allow fast reload; otherwise printf-debugging via drawing text with a VDP2 debug font layer is the standard. No official GDB stub; Kronos's debugger is your GDB substitute. [MEDIUM]
-- Crash capture on hardware: install SH-2 exception vector handlers early (illegal instruction, address error) that dump PC/SR/registers to the screen as hex via VDP2 text — Yaul installs default handlers that display a register dump panic screen. Rely on it: an address-error panic almost always means misaligned access or a wild pointer into an unmapped region. [MEDIUM]
-- Anti-pattern: do NOT profile on an emulator — frame budgets, DMA overlap, and bus stalls are wrong; do NOT ship after emulator-only testing.
+- **Mednafen** (ss core): useful reference for CPU, graphics, and SCSP emulation, but **no emulator proves real-hardware correctness**. A Mednafen failure is a strong diagnostic signal, not a theorem about all consoles. [MEDIUM]
+- **Ymir** (`ymir-emu/Ymir`) is a major modern accuracy/debugging option: SH-2 disassembly, breakpoints/watchpoints and call/data stack tracing, memory dumps, VDP2 VRAM-access timing and overlay views, CD partitions, and SCSP-related debugging. **Version checkpoint (2026-11-13): stable v0.4.1 released 2026-10-18**; v0.4.2/Vulkan was listed *in development*, and nightlies are experimental. Prefer its debugger for detailed subsystem inspection and cross-check tricky behavior against Mednafen/hardware. [HIGH] [Changelog](https://github.com/ymir-emu/Ymir/blob/main/CHANGELOG.md) · [Releases](https://github.com/ymir-emu/Ymir/releases)
+- **Kronos** (Yabause fork) offers SH-2/VDP diagnostics and convenient iteration. **Yaba Sanshiro / classic Yabause** can be helpful for quick smoke tests but are not sufficient validation for cache/DMA/timing-sensitive code. Avoid a permanent absolute accuracy ranking across versions; prefer **differential testing** of Mednafen, Ymir, Kronos, and physical hardware. [MEDIUM]
+- Emulators commonly differ on exact bus contention/DMA timing, cache effects, CD seek latency, indirect SCU DMA edge cases, uninitialized-VRAM contents, peripheral quirks, and cartridge-loader timing. Record which engine/version and BIOS/region were used. **Emulator-only success is not hardware validation.** [MEDIUM]
+- **Hardware GDB is possible with a suitable transport**: `yaul-org/libyaul-gdbstub` is an open-source standalone stub; its README describes compiling `gdbstub.bin`, placing it in writable RAM, and supplying a byte-oriented device driver (e.g. a supported USB cartridge). It is **not a turnkey GDB service on every Saturn**; verify peripheral, load address, vector ownership, memory budget, and GDB transport. [HIGH] [Source](https://github.com/yaul-org/libyaul-gdbstub)
+- Hardware debugging alternatives: USB development carts, serial/debug output where supported, exception handlers dumping PC/SR/registers via VDP2 text, and minimal register/VRAM test ROMs. Follow *the exact currently checked-out* Yaul exception setup rather than assuming every version presents the same panic screen. [MEDIUM]
+- **Profiling**: emulator instruction traces, memory dumps, and VDP diagnostics are useful for localization, but final throughput claims (VDP1 draw completion, VDP2 access cycles, DMA overlap, CD/audio streaming, and master/slave contention) require measured hardware or a clearly marked emulation-only result. Do not profile exclusively in emulator and present it as hardware FPS. [HIGH]
 
 ## 10. COMMON FAILURE MODES
 
@@ -166,6 +177,10 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 | Slow: 60→30→20 fps steps | VDP1-heavy scenes | Command table exceeds one frame draw time | Cut quads, move layers to VDP2, shrink textures (fill-rate bound) | [HIGH] |
 | Wrong aspect / overscan cut | PAL console or 352-px mode | Hardcoded NTSC 320×224 assumptions | Query/set TVMD per region; design safe areas | [MEDIUM] |
 | Random corruption only with slave CPU enabled | Dual-CPU code | No cache coherency between SH-2s | Share data via 0x20000000 mirror; purge before handoff | [HIGH] |
+| Background disappears/flickers while VDP1 looks correct | VDP2 multi-layer scene | VRAM bank cycle conflict, inaccessible fetch pattern, or unsupported layer combination | Inspect VDP2 access timing/banks (Ymir if available), then isolate one layer at a time | [MEDIUM] |
+| CD music plays but asset loading stalls | CD-DA + CD data | CD-DA consumes optical drive access time | Choose load windows, preload assets, or use buffered/decoded music instead | [HIGH] |
+| GDB stub appears unresponsive | Real hardware with USB/dev cart | Stub not in writable memory, unset stack, or wrong/missing byte-device driver | Check libyaul-gdbstub README and actual transport driver before debugging program state | [MEDIUM] |
+| Image boots via emulator but fails under SAROO | Cartridge loader | Firmware, timing, cartridge configuration or CD emulation difference | Record SAROO hardware/firmware, compare another loader and real drive when available | [MEDIUM] |
 
 ## 11. ANTI-PATTERNS
 
@@ -179,21 +194,24 @@ You are operating as a Sega Saturn homebrew expert. Follow every rule in this do
 8. Do NOT put everything on VDP1; offload backgrounds, skies, and HUD to VDP2 planes. [HIGH]
 9. Do NOT touch sound RAM in bulk while the 68K is running. [MEDIUM]
 10. Do NOT treat the 4.5 MB total RAM as one heap — it is seven special-purpose pools. [HIGH]
-11. Do NOT trust Yabause-family emulators for validation; Mednafen minimum, hardware for anything touching DMA/cache/timing. [MEDIUM]
+11. Do NOT treat any emulator as hardware validation; use Mednafen and/or Ymir for diagnostics, differential checks where useful, and physical hardware for timing/cache/DMA claims. [HIGH]
 12. Do NOT hardcode NTSC timing (59.94 Hz) or 320×224. [HIGH]
 13. Do NOT scatter small files across the ISO — CD seeks at 2× are brutal; pack and read contiguously. [MEDIUM]
 14. Do NOT reference or link SGL/SBL (leaked Sega SDKs) — use Yaul; flag any feature gap instead. [HIGH]
 15. Do NOT enable the slave SH-2 expecting 2× speedup — plan for ~1.5× on bus-friendly workloads. [MEDIUM]
+16. Do NOT label SRL or an SGL-backed SEQ/TON player as a clean-room/SGL-free SDK; verify transitive dependencies and content/tool licensing. [HIGH]
+17. Do NOT claim VDP2 has zero cost; validate bank/cycle constraints and enabled layer combinations. [HIGH]
+18. Do NOT claim an SDK API or `make` target exists until verified against the chosen revision's headers/examples/Makefile. [HIGH]
 
 ## 12. PORTING DECISION TREE
 
 1. **Audit floating-point usage.** Priority #1 because no FPU exists; a float-heavy engine (Quake-era or later) needs a fixed-point conversion plan before anything else. Skip it and the port will "work" at single-digit fps or not link cleanly. [HIGH]
 2. **Audit memory footprint against 2 MB work RAM (+1 MB VRAM budgets).** Decide what pool each subsystem lives in. Skip it and you discover mid-port that assets + code + heap cannot coexist. [HIGH]
 3. **Fix endianness and alignment.** Big-endian + strict alignment breaks file loaders and packed structs written for x86. Skip it and get address-error panics and garbled assets. [HIGH]
-4. **Stand up the Yaul build (hello-world ISO booting in Mednafen and on hardware).** Everything downstream depends on a trusted build/deploy loop. Skip it and you cannot distinguish code bugs from toolchain bugs. [HIGH]
+4. **Stand up a reproducible booting example using the project's actual SDK** (Yaul by default for new clean-room projects; otherwise inspect Jo Engine/custom SDK). Verify the CUE/image in Mednafen/Ymir and, when available, the selected hardware loader. Record the toolchain, source revision, and outputs; do not mix APIs. [HIGH]
 5. **Design the renderer around VDP1 quads + VDP2 planes** — map the engine's drawing model (BSP surfaces, sprites, UI) onto quad lists and scroll planes; decide the sorting strategy replacing the Z-buffer. Skip it and you get a CPU software renderer at unusable speed. [HIGH]
 6. **Replace file I/O with CD-block/ISO9660 reads with contiguous layout.** Skip it and loads take minutes and stutter. [MEDIUM]
-7. **Audio: choose CD-DA for music + SCSP PCM slots for SFX first; sequenced drivers later.** Skip it and audio becomes an open-ended subproject blocking release. [MEDIUM]
+7. **Audio: choose a CD-DA vs. SCSP PCM vs. proven ponèSound/streamed-ADX design early.** Budget disc access, RAM, sound-CPU processing, and concurrent loading; treat SGL-dependent SEQ/TON toolchains as incompatible unless an independent legal playback backend is verified. [MEDIUM]
 8. **Only then consider the slave SH-2 and SCU DSP** for transform/mixing workloads, with uncached-mirror communication. Doing this earlier multiplies debugging surface before the single-CPU path is proven. [HIGH]
 
 ## 13. QUICK REFERENCE CHEAT SHEET
@@ -206,12 +224,15 @@ RAM: 1 MB High WRAM @0x06000000 (fast, code here) + 1 MB Low WRAM @0x00200000 (s
      + Sound RAM 512K @0x05A00000 + CD buffer 512K + Backup 32K. No MMU. Strict alignment.
 GPU: VDP1 = QUADS ONLY (no tris, no Z-buffer, painter's sort), gouraud, RGB555/4-8bit pal,
      double-buffered FB. VDP2 = 4 scroll planes + rotation planes, compositing -> put
-     backgrounds/HUD/sky here, it's free. 320×224@59.94 NTSC / 50 PAL. No shaders, no GL.
-AUDIO: SCSP 32 PCM slots (8/16-bit BE, ≤44.1 kHz) + 68EC000 driver CPU; CD-DA for music.
+     backgrounds/HUD/sky here when BANK/CYCLE budget permits. 320×224@59.94 NTSC / 50 PAL.
+AUDIO: SCSP 32 PCM slots (8/16-bit BE) + 68EC000 sound CPU; ponèSound PCM/ADX/streams,
+       or CD-DA music (CD-DA competes with CD data reads).
 INPUT: polled via SMPC INTBACK each VBlank; check peripheral type IDs (pads/3D pad/multitap).
 SDK: Yaul (libyaul) + sh2eb-elf-gcc (-m2 -mb). NEVER SGL/SBL (leaked). ELF->BIN->ISO+IP.BIN,
-     image base 0x06004000. Emulators: Mednafen (accuracy) > Kronos (debugger) >> Yabause.
-BOOT: disc security ring -> need Pseudo Saturn Kit / ODE (Satiator, Fenrir, MODE) / modchip.
+     common image base 0x06004000; verify actual linker/IP settings and Makefile targets.
+DEBUG: Ymir (modern SH-2/VDP2/CD/SCSP diagnostics), Mednafen (cross-check), Kronos; HW final.
+BOOT: disc security ring -> Pseudo Saturn Kit / ODE (Satiator, Fenrir, MODE) / modchip;
+      SAROO is a cartridge-slot SD/CD-block loader with expansion RAM (firmware-specific).
 DMA: SCU DMA for WRAM->VRAM; 4-byte alignment; B-bus quirks; never CPU-memcpy to VRAM.
 TOP BUGS: stale cache (works in emu, dies on HW), misalignment faults, endianness in assets,
      half-transparency seams on distorted quads, 60->30 fps cliffs from VDP1 overdraw.
@@ -226,16 +247,16 @@ When this skill is used in an active development session (not just reference), y
 - **STATE: IMPLEMENTATION** — Write/modify code based on this document and training data. No hardware testing occurs here.
 - **STATE: BUILD_REQUEST** — Output the exact build commands and ask the user to compile and run on real hardware (or Mednafen if the user designates it as the validation target).
 - **STATE: WAITING_FOR_HARDWARE** — STOP. Output ONLY a hardware test protocol. Do NOT write code, do NOT speculate on fixes, do NOT enter debugging loops.
-- **STATE: VALIDATION** — User reports back results. Classify the result as SUCCESS, PARTIAL, or FAILURE.
+- **STATE: VALIDATION** — User reports back results. Classify as **SUCCESS, PARTIAL, or FAILURE**, without silently treating a partial as success.
 - **STATE: NEXT_GOAL** — On SUCCESS, propose the next logical milestone and ask for confirmation.
 
 ### STATE TRANSITION RULES
 
 1. **ANALYSIS → IMPLEMENTATION**: Allowed only after you have identified the specific files to modify and listed them to the user.
 2. **IMPLEMENTATION → BUILD_REQUEST**: Allowed only after you have provided a complete, compilable code change. You must include:
-   - Exact `make` / build command (e.g., `make clean && make image`)
-   - Expected output file name and location (e.g., `build/game.iso` + `.cue`)
-   - How to transfer to the target hardware (burn CD-R for modchip/PSKai, copy to Satiator/Fenrir/MODE SD, or load .cue in Mednafen)
+   - Exact build command **confirmed against the project's Makefile/README** (for example `make clean && make image` **only if it really exists**)
+   - Expected output file name and location **confirmed against the project** (do not invent `build/game.iso`)
+   - How to deploy on the designated target (CD-R with suitable boot method, Satiator/Fenrir/MODE/SAROO with their actual supported image structure, or CUE in Mednafen/Ymir)
    - What the user should observe on screen/audio/controller
 3. **BUILD_REQUEST → WAITING_FOR_HARDWARE**: You MUST output the following exact header:
    ```
@@ -245,27 +266,29 @@ When this skill is used in an active development session (not just reference), y
    DEPLOY: [Method]
    OBSERVE: [Specific expected behavior]
    REPORT BACK: Please reply with EXACTLY one of:
-     - SUCCESS: [Describe what you saw]
-     - FAILURE: [Describe what you saw, including any error codes, black screen, crashes]
+     - SUCCESS: [Expected behavior observed]
+     - PARTIAL: [What works and what doesn't; actual behavior]
+     - FAILURE: [Observed behavior, error codes/PC/registers if available]
    === STOP ===
    ```
    After this header, you STOP generating. You do not offer fixes. You do not guess.
-4. **WAITING_FOR_HARDWARE → VALIDATION**: Triggered ONLY by a user message containing "SUCCESS" or "FAILURE".
-   - If the user says "SUCCESS": move to NEXT_GOAL.
-   - If the user says "FAILURE": move to DEBUG_PROTOCOL.
-   - If the user says anything else (e.g., "it kind of works", "almost"): ask for clarification using the SUCCESS/FAILURE binary. Do NOT proceed.
-5. **VALIDATION (FAILURE) → DEBUG_PROTOCOL**: You must output a **DEBUG BUILD PROTOCOL**:
+4. **WAITING_FOR_HARDWARE → VALIDATION**: Triggered when the user reports **SUCCESS**, **PARTIAL**, or **FAILURE**, or clearly describes their outcome in natural language. Do not force a binary answer when a partial observation provides real evidence.
+   - **SUCCESS**: next goal only after the designated test passes; explicitly distinguish "emulator-validated" from "hardware-validated".
+   - **PARTIAL**: record which expected observations passed and failed; move to a focused DEBUG_PROTOCOL for the missing behavior.
+   - **FAILURE**: move to DEBUG_PROTOCOL.
+   - If the outcome is unclear, ask **one** targeted question about the observable result. Do NOT proceed to a new milestone.
+5. **VALIDATION (PARTIAL/FAILURE) → DEBUG_PROTOCOL**: Output a **DEBUG BUILD PROTOCOL**:
    - A minimal C/assembly test case that isolates the failure (e.g., write a known pattern to VDP2 CRAM and set a single back-screen color), OR
    - A checklist of exactly 3 specific diagnostic steps (e.g., "Confirm the panic screen shows an address-error PC inside the loader", "Read the framebuffer pointer through 0x25C80000 uncached and report the first 4 words", "Boot the same .cue in Mednafen and report whether it differs from hardware").
    - You must ask the user to run this diagnostic and report back.
    - You must NOT rewrite the entire implementation. You must NOT guess and patch simultaneously.
-6. **DEBUG_PROTOCOL → WAITING_FOR_HARDWARE**: After providing the debug protocol, return to WAITING_FOR_HARDWARE.
-7. **VALIDATION (SUCCESS) → NEXT_GOAL**: Propose the next milestone from the goal stack below. Do NOT implement it until the user confirms.
+6. **DEBUG_PROTOCOL → WAITING_FOR_HARDWARE**: After providing the debug protocol, return to WAITING_FOR_HARDWARE. Collect the project commit, exact build output, designated target and version, BIOS/region, loader/firmware (if any), screenshot/log, and relevant PC/SR/register dump **only when available and useful**.
+7. **VALIDATION (SUCCESS) → NEXT_GOAL**: Propose the next milestone from the goal stack below. Do NOT implement it until the user confirms. An emulator pass is not a physical-hardware pass; if hardware testing is unavailable, state the limitation rather than blocking unrelated analysis forever.
 
 ### ANTI-LOOP PROTOCOL
 If the same goal fails hardware validation more than **2 times**, you MUST:
 - Stop attempting fixes.
-- Output: `ESCALATION: This goal requires hardware debugging beyond static analysis. Recommend: [Kronos debugger session / Mednafen-vs-hardware differential / USB DataLink memory dump / SegaXtreme community forum].`
+- Output: `ESCALATION: This goal requires more evidence or hardware-specific debugging. Recommend: [Ymir SH-2/VDP2/CD debugger / Mednafen differential / Kronos debugger / Yaul GDB stub with supported transport / hardware memory dump / SegaXtreme Saturn development forum].`
 - Ask the user if they want to:
   a) Skip this goal and mark it as BLOCKED, or
   b) Provide emulator logs / register dumps for further analysis.
@@ -285,7 +308,86 @@ You must ONLY work on the **active goal** (top of stack). You must NOT implement
 ## BEHAVIORAL CONSTRAINTS (ALWAYS ACTIVE)
 
 - Do NOT provide generic PC/mobile advice unless explicitly marked cross-platform.
-- Do NOT hallucinate APIs or hardware features. The Saturn has no OpenGL, no shaders, no FPU, no Z-buffer, no virtual memory, no usable networking — say so and give the Saturn-native alternative.
+- Do NOT hallucinate APIs or hardware features. The Saturn has no native OpenGL, programmable shaders, FPU, Z-buffer, or MMU/virtual-memory platform. Network/serial projects exist experimentally; **do not** claim either universal Internet connectivity or that communication is categorically impossible. Give the Saturn-native alternative.
 - Do NOT omit "obvious" platform-specific details: cache purging, big-endianness, strict alignment, memory-pool partitioning, quad-based rendering.
 - If you circle on a topic or hit contradictory information, STOP and output a DEBUG BUILD PROTOCOL: a minimal C/assembly test case that definitively resolves the uncertainty on hardware or Mednafen.
-- PREFER open-source homebrew SDKs (Yaul) over leaked official SDKs (SGL/SBL) in ALL cases. All code examples must compile with the community toolchain. Do NOT reference leaked SDK APIs, paths, or build flags. If a community-SDK feature gap exists, flag it explicitly and propose a workaround or minimal hardware test marked [LOW].
+- PREFER verifiable open-source, non-SGL homebrew SDKs (Yaul by default; compatible Jo Engine checkouts may be used when independently audited) over proprietary/leaked Sega SDKs. All code examples must **target the repository's actually selected community toolchain**. Do NOT reference leaked SDK APIs, paths, or build flags. If a feature gap exists, flag it explicitly and propose a tested alternative or minimal hardware test marked [LOW].
+- Never assume the most recently updated documentation is identical to the latest tagged release; inspect branch/tag/commit and transitive licenses. Cross-check modern tools against Section 15 and the source URLs in Section 17.
+
+
+## 15. MODERN SATURN PROJECTS AND TOOL SELECTION (CHECKED 2026-11-13)
+
+**Purpose:** consult the original project repository and the *actual version in use* before implementing a subsystem. "Present in GitHub" is evidence of an implementation, **not** proof it is mature, up-to-date, commercially licensable, Yaul-compatible, or tested on a given hardware loader. Do not mix code across SDK families without an explicit port and license audit.
+
+| Project | Use / verified evidence | Compatibility and cautions | Priority |
+|---|---|---|---|
+| [yaul-org/libyaul](https://github.com/yaul-org/libyaul) | Open-source Saturn SDK; contains `libmic3d`, `libfiber`, `libmenu`, `libtga`, `libbcl`, tools | Prefer matching examples, checked-out headers, build config and license | Core |
+| [yaul-org/libyaul-gdbstub](https://github.com/yaul-org/libyaul-gdbstub) | Standalone SH-2 GDB stub, `gdbstub.bin`, selectable byte-device transport | Requires suitable writable RAM, stack, debugging transport, integration | High |
+| [ymir-emu/Ymir](https://github.com/ymir-emu/Ymir) | Integrated SH-2, VDP/VRAM, CD-block and memory debugging; stable v0.4.1 on 2026-10-18 | Nightlies and v0.4.2 development notes are **not** stable release claims; emulation ≠ hardware | Core |
+| [johannes-fetz/joengine](https://github.com/johannes-fetz/joengine) | C 2D/3D engine; docs list model/level systems, profile tools, software/voxel paths | Docs version **2026.11.2** vs last tagged **v2025.1** in checked release listing; inspect selected checkout for Sega-library dependency | High |
+| [ponut64/SCSP_poneSound](https://github.com/ponut64/SCSP_poneSound) | MIT 68K audio driver; PCM, ADX decompression, stream libraries, Jo demos | Driver-specific rates/channels/buffers; test concurrent CD load and integration with chosen SDK | High |
+| [tpunix/SAROO](https://github.com/tpunix/SAROO) | Open-source cartridge-slot SD HD loader/CD-block emulation and 1 MB/4 MB RAM | Firmware and hardware revision affect compatibility; not conventional drive-bay ODE | High |
+| [slinga-homebrew/Save-Game-Copier](https://github.com/slinga-homebrew/Save-Game-Copier) | Save backup/copying and loader transfer examples; 2026 pre-releases for experimental serial/modem | 3.7.0/3.7.1 experimental modes not general networking; test specific media | Medium |
+| [Teuthida255/Tethys](https://github.com/Teuthida255/Tethys) | Experimental SCSP instrument editor built from a modified ponèSound driver | Jo Engine based; README says ADX support removed in its modified driver; research reference | Experimental |
+| [jfsantos/mid2seq](https://github.com/jfsantos/mid2seq) | MIDI→SEQ, SF2→TON, FM patch/editor conversion tools | Describes **SGL sound-driver playback**; not clean-room runtime; review separate WASM/editor licensing | Research only |
+| [ReyeMe/SaturnRingLib](https://github.com/ReyeMe/SaturnRingLib) | Modern C++ wrapper and tooling | Explicitly **SGL-dependent** in README: **do not integrate under this skill's no-SGL policy** | Comparison only |
+| [R11/saturn-libs](https://github.com/R11/saturn-libs) | Experimental peripheral, backup, NetLink code + host-side TDD | Saturn build docs reference SGL headers/tooling; not automatically compliant with Yaul/clean-room goals | Research only |
+
+### Recommended selection rules
+
+1. **New general-purpose clean-room game** → start with Yaul + a matching examples revision; evaluate `libmic3d` before starting a 3D transform library.
+2. **Existing Jo Engine project** → stay on its own API/build conventions, inspect the selected checkout's dependencies; do not import Yaul calls into Jo code as though names were interchangeable.
+3. **Hard-to-debug VDP2/VDP1/SH-2/CD behavior** → compare Ymir and Mednafen; use Ymir's subsystem inspectors; verify on hardware for timing/DMA/cache issues.
+4. **Audio needs beyond simple SFX/CD-DA** → review ponèSound before writing a new 68K driver; choose real sample rates, channels, memory and throughput based on its source revision.
+5. **Hardware reload/save workflows** → distinguish drive ODE, drive-interceptor, cartridge loader (SAROO), USB cart, backup cartridge and actual disc. Log model and firmware. Never assume all can hot-patch a running program.
+6. **Networking/SEQ/FM experiments** → keep SGL-backed projects clearly labeled. The existence of research code doesn't waive clean-room, dependency, or license constraints.
+
+## 16. SOURCE-AWARE DEVELOPMENT AND VALIDATION RULES (ALWAYS ACTIVE)
+
+### Before writing any project-specific code
+
+1. **Inventory the project**: identify SDK/engine, commit or tag, target hardware/loader, toolchain prefix/version, Makefile/build script, linker script, image builder, boot/entry settings, and existing example tests. Ask for missing *essential* details only when they cannot be inferred from the codebase.
+2. **Source-of-truth hierarchy for APIs**: checked-out project's header and example > matching version's official docs/README > unpinned upstream docs > community posts > prior model knowledge. If unavailable, explicitly label pseudocode instead of presenting invented functions as compilable C.
+3. **Search for working implementations**: look for graphics (Yaul `libmic3d`, Jo's 3D modules), SCSP drivers (ponèSound), debugger (Ymir/GDB stub), and storage/save implementations before designing a replacement. Check licensing and interface compatibility **before copying anything**.
+4. **Pin source versions**: describe *which* Jo Engine revision, Yaul branch/commit, driver checkout, emulator build, and target firmware your claim applies to. Never infer a stable release from a web site's documentation version.
+5. **Plan performance with real budgets**: VDP1 command completion/fill-rate; VDP2 access cycles and bank allocation; SCU DMA alignments and cache rules; SH-2 master/slave bus pressure; SCSP sound-RAM/68K timing; CD seek + CD-DA/asset-stream competition.
+6. **Do not overclaim builds**: a proposed patch is "intended to compile" until actually built. Report build commands and output paths only after inspecting the source tree. Do not claim physical testing, screenshots, or timing measurements you have not performed.
+
+### Three distinct verification levels
+
+- **BUILD VERIFIED** — actual compile/link/image-generation succeeded, with command, toolchain version, output filenames and errors/warnings captured. This does *not* imply an emulator/hardware boot.
+- **EMULATOR VERIFIED** — specified image ran in an identified emulator+version+BIOS region, with observed behavior. Name Ymir, Mednafen, or Kronos as applicable; still not a physical-hardware pass.
+- **HARDWARE VERIFIED** — user or tester observed the specified behavior on a physical Saturn; record region/model, optical/cart loader and firmware when relevant, and the exact test outcome.
+
+### Debug evidence contract
+
+On **PARTIAL** or **FAILURE**, collect what is available from: `expected vs. observed`, SDK revision, exact command and full compiler/linker error, image path, program counter/SR/registers, Ymir/Mednafen/Kronos version, BIOS/region, cartridge/ODE/SAROO revision and firmware, VRAM/DMA/SCSP snapshots, and timing or audio underrun records. **Choose the smallest discriminating test**; do not simultaneously rewrite unrelated rendering, audio, and loader systems. Your Section 14 mandatory `WAITING_FOR_HARDWARE` stop still applies to the active development milestone, and "hardware" means the *designated test target*, clearly named.
+
+### License and dependency guardrail
+
+- Open-source code is **not** automatically independent of Sega-proprietary libraries. A wrapper's own permissive license does not resolve transitive library rights.
+- Under this skill's policy, **do not integrate** SGL/SBL, SGL-backed SRL, or SGL-dependent sound playback into clean-room Yaul projects. For potentially independent newer Jo Engine checkouts, inspect linked archives/imported headers and release revision before concluding compliance.
+- Check sound tools separately from sound runtimes. `mid2seq`'s conversion sources and its bundled SCSP/WASM preview/editor files may have different license terms; read the relevant LICENSE files for commercial redistribution.
+
+## 17. RESEARCH LINKS, VERIFIED CHANGE NOTES, AND NEXT REVIEW
+
+**Checked on 2026-11-13.** These entries are source references, **not assertions that every project has shipped a new stable version on that date**. Always recheck releases and commits before calling anything "latest."
+
+- **Ymir** — [release listing](https://github.com/ymir-emu/Ymir/releases), [CHANGELOG](https://github.com/ymir-emu/Ymir/blob/main/CHANGELOG.md): stable 0.4.1 dated 2026-10-18; 0.4.0 brought D3D12/Metal backend work and SH-2/VDP2 diagnostics; 0.4.2/Vulkan listed as in development at this review. Its built-in debugger is a material omission in the original §9.
+- **Jo Engine** — [online API docs](https://jo-engine.org/doxygen/), [tagged releases](https://github.com/johannes-fetz/joengine/releases): docs identify 2026.11.2 and claim direct hardware without Sega libraries; last tagged stable release on checked listing: v2025.1. **Do not conflate docs with stable binaries or assume every checkout is SGL-free.**
+- **Yaul** — [main SDK repository](https://github.com/yaul-org/libyaul), [GDB stub](https://github.com/yaul-org/libyaul-gdbstub): `libmic3d`/other sublibraries and practical SH-2 GDB stub provide alternatives to unnecessary reinvention; inspect exact code/version for interfaces.
+- **Audio** — [ponèSound](https://github.com/ponut64/SCSP_poneSound) README describes PCM, software ADX decoding, streamed samples, limitations, and CD-DA drive contention. [Tethys](https://github.com/Teuthida255/Tethys) is experimental music/instrument research. [mid2seq](https://github.com/jfsantos/mid2seq) provides offline SEQ/TON tools but explicitly describes an SGL-driver playback pipeline and separately licensed WASM portions.
+- **Cartridge/deployment/save** — [SAROO](https://github.com/tpunix/SAROO) documents SD loading and 1/4 MB RAM via cartridge-port hardware. [Save Game Copier releases](https://github.com/slinga-homebrew/Save-Game-Copier/releases) include May 2026 experimental modem/serial features and May 14 3.7.1 Satiator fix (pre-release).
+- **Compatibility caveats** — [SaturnRingLib README](https://github.com/ReyeMe/SaturnRingLib) explicitly states SGL wrapper. [R11/saturn-libs](https://github.com/R11/saturn-libs) demonstrates experimental NetLink/host tests but documents SGL target builds, unsuitable as a clean-room drop-in.
+
+### 2026-11-13 change summary
+
+1. Updated §2 SDK classification, Jo version/release caveat, and SRL/SGL compliance warning; added Yaul auxiliary libraries.
+2. Corrected §3 VDP2 "free" oversimplification, added bank/cycle scheduling, and pointed to existing 3D libraries.
+3. Expanded §6 with ponèSound PCM/ADX streaming, CD-DA data-access tradeoffs, experimental instruments, and license cautions.
+4. Updated §7 for SAROO, Save Game Copier, experimental NetLink/serial, and loader/firmware distinctions.
+5. Corrected §8's assumptions about universal SDK Make targets, path names, and environment variables.
+6. Expanded §9 to include Ymir's 2026 debugger, community Yaul GDB stub, and cross-emulator + hardware evidence.
+7. Updated failure modes, anti-patterns, decision tree, and quick reference to match the above.
+8. Resolved §14's **PARTIAL-vs-binary** validation contradiction, preserved the mandatory stop, and added explicit build/emulator/hardware evidence labels.
+9. Added §§15–17 as a version-aware project reference, code-verification protocol, and durable links for future refreshes.
